@@ -87,43 +87,35 @@ public class ManageBuckets implements Closeable {
          System.err.println("Cannot open service account private key PEM file: " + args[1] + "\n" + e.getMessage());
          System.exit(1);
       }
+      ManageBuckets manageBuckets = new ManageBuckets(serviceAccountEmailAddress, serviceAccountKey);
+
       String command = args[2];
       String projectName = null;
       String bucketName = null;
-      if (command.equals("create")) {
-         projectName = args[3];
-         bucketName = args[4];
-      } else if (command.equals("delete")) {
-         bucketName = args[3];
-         if (args.length >= 5) {
-            System.err.println("Command 'delete' require only one additional parameter (bucketName).");
+      try {
+         if (command.equals("create")) {
+            projectName = args[3];
+            bucketName = args[4];
+            manageBuckets.createBucket(projectName, bucketName);
+         } else if (command.equals("delete")) {
+            bucketName = args[3];
+            if (args.length >= 5) {
+               System.err.println("Warning: Command 'delete' require only one additional parameter (bucketName).");
+            }
+            manageBuckets.deleteBucket(bucketName);
+         } else if (command.equals("list")) {
+            projectName = args[3];
+            if (args.length >= 5) {
+               System.err.println("Warning: Command 'list' require only one additional parameters (projectName).");
+            }
+            manageBuckets.listBuckets(projectName);
+         } else {
+            System.err.println("Unknown command: " + command);
             System.exit(1);
          }
-      } else if (command.equals("list")) {
-         projectName = args[3];
-         if (args.length >= 5) {
-            System.err.println("Command 'list' require only one additional parameters (projectName).");
-            System.exit(1);
-         }
-      } else {
-         System.err.println("Unknown command: " + command);
+      } catch (RuntimeException e) {
+         System.err.format("Command %s failed: %s%n", command, e.getMessage());
          System.exit(1);
-      }
-      ManageBuckets manageBuckets = new ManageBuckets(serviceAccountEmailAddress, serviceAccountKey);
-
-      if (command.equals("create")) {
-         manageBuckets.createBucket(projectName, bucketName);
-      } else if (command.equals("delete")) {
-         manageBuckets.deleteBucket(bucketName);
-      } else if (command.equals("list")) {
-         manageBuckets.listBuckets(projectName);
-      } else {
-         try {
-            manageBuckets.close();
-         } catch (IOException e) {
-            e.printStackTrace();
-         }
-         throw new RuntimeException("Should never happen.");
       }
 
       try {
@@ -138,14 +130,6 @@ public class ManageBuckets implements Closeable {
       cloudStorageApi = ContextBuilder.newBuilder(PROVIDER)
             .credentials(serviceAccountEmailAddress, serviceAccountKey)
             .buildApi(GoogleCloudStorageApi.class);
-      /*
-      // This works fine:
-      // System.out.println("result: " + cloudStorageApi.getBucketApi().listBucket("googpl-gcp-oss-7").size());
-      ///
-      cloudStorageApi.getBucketApi().createBucket("googpl-gcp-oss-7", new BucketTemplate().name("marekws"));
-      System.out.println("result: " + cloudStorageApi.getBucketApi().listBucket("googpl-gcp-oss-7").size());
-      //
-       */
    }
 
    /**
@@ -154,13 +138,7 @@ public class ManageBuckets implements Closeable {
     * @param bucketName Name of the bucket to create.
     */
    public final void createBucket(final String projectName, final String bucketName) {
-      Bucket bucket = null;
-      try {
-         bucket = cloudStorageApi.getBucketApi().createBucket(projectName, new BucketTemplate().name(bucketName));
-      } catch (RuntimeException e) {
-         System.err.println("Creating bucket " + bucketName + " failed.\n" + e.getMessage());
-         System.exit(1);
-      }
+      Bucket bucket = cloudStorageApi.getBucketApi().createBucket(projectName, new BucketTemplate().name(bucketName));
       if (bucket != null) {
          System.out.print("Bucket " + bucket.getName() + " successfully created in project " + projectName + " .");
       } else {
@@ -174,13 +152,8 @@ public class ManageBuckets implements Closeable {
     * @param bucketName Name of the bucket to delete.
     */
    public final void deleteBucket(final String bucketName) {
-      try {
-         cloudStorageApi.getBucketApi().deleteBucket(bucketName);
-         System.out.print("Bucket " + bucketName + " successfully deleted.");
-      } catch (RuntimeException e) {
-         System.err.println("Deleting bucket " + bucketName + " failed.\n" + e.getMessage());
-         System.exit(1);
-      }
+      cloudStorageApi.getBucketApi().deleteBucket(bucketName);
+      System.out.print("Bucket " + bucketName + " successfully deleted.");
    }
 
    /**
